@@ -1,1 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 프린팅 통합 시뮬레이터 (시간 & 비용)</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: #333; padding: 20px; margin: 0; }
+        .container { max-width: 600px; margin: 30px auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #222; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #666; font-size: 14px; margin-bottom: 25px; }
+        
+        .section-title { font-size: 16px; font-weight: bold; color: var(--primary-color); border-left: 4px solid var(--primary-color); padding-left: 8px; margin: 20px 0 10px 0; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        input:focus { border-color: var(--primary-color); outline: none; }
+        
+        button { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
+        button:hover { background-color: #0056b3; }
+        
+        #result-box { margin-top: 25px; display: none; }
+        .result-card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+        .result-card h4 { margin: 0 0 8px 0; color: #555; font-size: 14px; }
+        .result-card p { margin: 0; font-size: 18px; font-weight: bold; color: #111; }
+        
+        .total-card { background: #e8f5e9; border: 1px solid #c8e6c9; }
+        .total-card h4 { color: #2e7d32; }
+        .total-card p { color: var(--success-color); font-size: 24px; }
+    </style>
+</head>
+<body>
 
+<div class="container">
+    <h2>3D 프린팅 사전 시뮬레이터</h2>
+    <div class="subtitle">진로 수행평가: 예상 제작 시간 및 비용 분석 프로그램</div>
+    
+    <div class="section-title">1단계: 출력 시간 예측 데이터</div>
+    <div class="input-group">
+        <label>출력물 총 높이 (mm)</label>
+        <input type="number" id="modelHeight" step="0.1" placeholder="예: 100">
+    </div>
+    <div class="input-group">
+        <label>레이어 두께 / 적층 높이 (mm)</label>
+        <input type="number" id="layerHeight" step="0.01" value="0.2" placeholder="보통 0.2mm">
+    </div>
+    <div class="input-group">
+        <label>레이어 1층당 평균 소요 시간 (초)</label>
+        <input type="number" id="timePerLayer" step="0.1" placeholder="예: 15">
+    </div>
+
+    <div class="section-title">2단계: 비용 계산 데이터</div>
+    <div class="input-group">
+        <label>예상 재료 무게 (g)</label>
+        <input type="number" id="weight" step="0.1" placeholder="예: 50">
+    </div>
+    <div class="input-group">
+        <label>재료 단가 (100g당 가격/원)</label>
+        <input type="number" id="unitPrice" placeholder="예: 3000">
+    </div>
+    <div class="input-group">
+        <label>시간당 프린터 전기요금 (원)</label>
+        <input type="number" id="electricityRate" value="150" placeholder="예: 150">
+    </div>
+
+    <button onclick="runSimulation()">종합 시뮬레이션 시작</button>
+
+    <div id="result-box">
+        <div class="section-title">최종 분석 결과</div>
+        
+        <div class="result-card">
+            <h4>💡 예상 적층 레이어 수</h4>
+            <p id="resLayers">0 층</p>
+        </div>
+        
+        <div class="result-card">
+            <h4>⏱️ 예상 소요 시간</h4>
+            <p id="resTime">0 시간</p>
+        </div>
+        
+        <div class="result-card">
+            <h4>💰 예상 재료비</h4>
+            <p id="resMaterialCost">0 원</p>
+        </div>
+        
+        <div class="result-card">
+            <h4>⚡ 예상 전기요금</h4>
+            <p id="resElectricityCost">0 원</p>
+        </div>
+        
+        <div class="result-card total-card">
+            <h4>🔥 최종 예상 제작 비용 (재료비 + 전기세)</h4>
+            <p id="resTotalCost">0 원</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function runSimulation() {
+    // 1. 데이터 가져오기
+    const modelHeight = parseFloat(document.getElementById('modelHeight').value);
+    const layerHeight = parseFloat(document.getElementById('layerHeight').value);
+    const timePerLayer = parseFloat(document.getElementById('timePerLayer').value);
+    
+    const weight = parseFloat(document.getElementById('weight').value);
+    const unitPrice = parseFloat(document.getElementById('unitPrice').value);
+    const electricityRate = parseFloat(document.getElementById('electricityRate').value);
+
+    // 유효성 검사 (빈칸 확인)
+    if (isNaN(modelHeight) || isNaN(layerHeight) || isNaN(timePerLayer) || isNaN(weight) || isNaN(unitPrice) || isNaN(electricityRate)) {
+        alert("모든 입력 칸을 올바르게 채워주세요.");
+        return;
+    }
+
+    // 2. 시간 예측 알고리즘 연산
+    const totalLayers = Math.floor(modelHeight / layerHeight);
+    const totalSeconds = totalLayers * timePerLayer;
+    const calculatedTime = totalSeconds / 3600; // 시간 단위 변환
+    
+    // 시간 표시 포맷팅 (예: 4.5시간 -> 4시간 30분)
+    const hours = Math.floor(calculatedTime);
+    const minutes = Math.round((calculatedTime - hours) * 60);
+
+    // 3. 비용 계산 알고리즘 연산
+    const materialCost = weight * (unitPrice / 100);
+    const electricityCost = calculatedTime * electricityRate;
+    const totalCost = materialCost + electricityCost;
+
+    // 4. 웹 화면에 결과 반영 및 출력
+    document.getElementById('resLayers').innerText = `${totalLayers.toLocaleString()} 층`;
+    document.getElementById('resTime').innerText = `${hours}시간 ${minutes}분 (총 ${calculatedTime.toFixed(2)}시간)`;
+    document.getElementById('resMaterialCost').innerText = `${Math.round(materialCost).toLocaleString()} 원`;
+    document.getElementById('resElectricityCost').innerText = `${Math.round(electricityCost).toLocaleString()} 원`;
+    document.getElementById('resTotalCost').innerText = `${Math.round(totalCost).toLocaleString()} 원`;
+
+    // 결과 창 보이기
+    document.getElementById('result-box').style.display = 'block';
+    
+    // 결과 화면으로 부드럽게 스크롤
+    document.getElementById('result-box').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+
+</body>
+</html>
